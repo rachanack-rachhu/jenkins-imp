@@ -8,28 +8,34 @@ pipeline {
             }
         }
 
-        stage('Install dependencies') {
+        stage('Build Docker Image') {
             steps {
-                sh '''
-                python3 -m venv venv
-                . venv/bin/activate
-                pip install --upgrade pip
-                pip install -r requirements.txt
-                '''
+                script {
+                    sh '''
+                    docker build -t flask-jenkins-app .
+                    '''
+                }
             }
         }
 
-        stage('Run App') {
+        stage('Run Docker Container') {
             steps {
-                sh '''
-                . venv/bin/activate
-                nohup python3 app.py > flask.log 2>&1 &
-                sleep 5
-                curl -f http://localhost:5000 || (echo "App failed to start" && exit 1)
-                '''
+                script {
+                    // Stop any previous container (if running)
+                    sh '''
+                    docker rm -f flask-jenkins-container || true
+                    docker run -d -p 5000:5000 --name flask-jenkins-container flask-jenkins-app
+                    sleep 5
+                    curl -f http://localhost:5000 || (echo "Container failed to start" && exit 1)
+                    '''
+                }
             }
         }
     }
+
+    post {
+        always {
+            echo "Pipeline completed."
+        }
+    }
 }
-
-
